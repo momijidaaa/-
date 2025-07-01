@@ -25,7 +25,7 @@
       flex-wrap: wrap;
       justify-content: center;
     }
-    button, input[type="color"] {
+    button, input[type="color"], select {
       padding: 10px;
       font-size: 16px;
     }
@@ -42,11 +42,14 @@
   <h1>お絵描きサイト</h1>
   <div class="toolbar">
     <input type="color" id="colorPicker" value="#000000">
+    <select id="bgOption">
+      <option value="white">背景：白</option>
+      <option value="transparent">背景：透明</option>
+    </select>
     <button onclick="clearCanvas()">クリア</button>
     <button onclick="download()">保存</button>
   </div>
-  <canvas id="canvas" width="1000
-" height="1000"></canvas>
+  <canvas id="canvas" width="800" height="600"></canvas>
 
   <script>
     const canvas = document.getElementById('canvas');
@@ -85,7 +88,7 @@
       ctx.stroke();
     }
 
-    function stopDraw(e) {
+    function stopDraw() {
       drawing = false;
       ctx.closePath();
     }
@@ -108,9 +111,22 @@
     }
 
     function download() {
+      const option = document.getElementById('bgOption').value;
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+
+      if (option === 'white') {
+        tempCtx.fillStyle = '#ffffff';
+        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+      }
+
+      tempCtx.drawImage(canvas, 0, 0);
+
       const link = document.createElement('a');
       link.download = 'drawing.png';
-      link.href = canvas.toDataURL();
+      link.href = tempCanvas.toDataURL('image/png');
       link.click();
     }
   </script>
