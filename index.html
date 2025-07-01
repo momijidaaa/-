@@ -14,19 +14,16 @@
       background: #f0f0f0;
       font-family: sans-serif;
     }
-    h1 {
-      font-size: 1.5em;
-      margin-top: 10px;
-    }
+    h1 { font-size: 1.5em; margin: 10px; }
     .toolbar {
       margin: 10px;
       display: flex;
-      gap: 10px;
       flex-wrap: wrap;
+      gap: 10px;
       justify-content: center;
     }
-    button, input[type="color"], select {
-      padding: 10px;
+    button, input[type="color"], input[type="range"], select {
+      padding: 5px 10px;
       font-size: 16px;
     }
     canvas {
@@ -35,6 +32,7 @@
       touch-action: none;
       max-width: 100%;
       height: auto;
+      transform-origin: top left;
     }
   </style>
 </head>
@@ -42,6 +40,8 @@
   <h1>お絵描きサイト</h1>
   <div class="toolbar">
     <input type="color" id="colorPicker" value="#000000">
+    <input type="range" id="lineWidth" min="1" max="20" value="2">
+    <button id="eraserBtn">消しゴム</button>
     <select id="bgOption">
       <option value="white">背景：白</option>
       <option value="transparent">背景：透明</option>
@@ -55,22 +55,53 @@
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     let drawing = false;
-    let color = document.getElementById('colorPicker').value;
+    let scale = 1;
+    let lastTouchDistance = 0;
+    let isEraser = false;
+
+    const colorPicker = document.getElementById('colorPicker');
+    const lineWidthSlider = document.getElementById('lineWidth');
+    const eraserBtn = document.getElementById('eraserBtn');
+    const bgOption = document.getElementById('bgOption');
+
+    let currentColor = colorPicker.value;
+    let currentLineWidth = parseInt(lineWidthSlider.value);
+
+    colorPicker.addEventListener('change', e => {
+      currentColor = e.target.value;
+      isEraser = false;
+      eraserBtn.textContent = "消しゴム";
+    });
+
+    lineWidthSlider.addEventListener('input', e => {
+      currentLineWidth = parseInt(e.target.value);
+    });
+
+    eraserBtn.addEventListener('click', () => {
+      isEraser = !isEraser;
+      eraserBtn.textContent = isEraser ? "ペンに戻す" : "消しゴム";
+    });
 
     function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
       if (e.touches) {
-        const rect = canvas.getBoundingClientRect();
         return {
-          x: e.touches[0].clientX - rect.left,
-          y: e.touches[0].clientY - rect.top
+          x: (e.touches[0].clientX - rect.left) / scale,
+          y: (e.touches[0].clientY - rect.top) / scale
         };
       } else {
-        return { x: e.offsetX, y: e.offsetY };
+        return {
+          x: (e.offsetX) / scale,
+          y: (e.offsetY) / scale
+        };
       }
     }
 
     function startDraw(e) {
-      e.preventDefault();
+      if (e.touches && e.touches.length === 2) {
+        lastTouchDistance = getDistance(e.touches[0], e.touches[1]);
+        return;
+      }
       drawing = true;
       const pos = getPos(e);
       ctx.beginPath();
@@ -78,12 +109,21 @@
     }
 
     function draw(e) {
+      if (e.touches && e.touches.length === 2) {
+        const newDist = getDistance(e.touches[0], e.touches[1]);
+        const delta = newDist - lastTouchDistance;
+        scale += delta * 0.005;
+        scale = Math.max(0.5, Math.min(3, scale));
+        canvas.style.transform = `scale(${scale})`;
+        lastTouchDistance = newDist;
+        return;
+      }
+
       if (!drawing) return;
-      e.preventDefault();
       const pos = getPos(e);
       ctx.lineTo(pos.x, pos.y);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = isEraser ? '#ffffff' : currentColor;
+      ctx.lineWidth = currentLineWidth;
       ctx.lineCap = "round";
       ctx.stroke();
     }
@@ -91,6 +131,12 @@
     function stopDraw() {
       drawing = false;
       ctx.closePath();
+    }
+
+    function getDistance(touch1, touch2) {
+      const dx = touch2.clientX - touch1.clientX;
+      const dy = touch2.clientY - touch1.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
     }
 
     canvas.addEventListener('mousedown', startDraw);
@@ -102,16 +148,12 @@
     canvas.addEventListener('touchmove', draw, { passive: false });
     canvas.addEventListener('touchend', stopDraw);
 
-    document.getElementById('colorPicker').addEventListener('change', e => {
-      color = e.target.value;
-    });
-
     function clearCanvas() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
     function download() {
-      const option = document.getElementById('bgOption').value;
+      const option = bgOption.value;
       const tempCanvas = document.createElement('canvas');
       const tempCtx = tempCanvas.getContext('2d');
       tempCanvas.width = canvas.width;
